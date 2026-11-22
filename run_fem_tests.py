@@ -173,8 +173,8 @@ def main():
             2500.0,
             0.35,
             50.0,  # PETG / CF-Nylon
-            ("y", inner_shape.BoundBox.YMin, 4.0),
-            ("y", inner_shape.BoundBox.YMax, 4.0, 20.0, App.Vector(0, 0, 1)),
+            ("z", inner_shape.BoundBox.ZMin, 2.0),
+            ("z", inner_shape.BoundBox.ZMax, 2.0, 20.0, App.Vector(0, 0, 1)),
             3.5,
         ),
         (
@@ -203,8 +203,8 @@ def main():
             70000.0,
             0.30,
             300.0,
-            ("z", skid_shape.BoundBox.ZMax, 5.0),
-            ("z", skid_shape.BoundBox.ZMin, 5.0, 40.0, App.Vector(0, 0, 1)),
+            ("z", skid_shape.BoundBox.ZMax, 12.0),
+            ("z", skid_shape.BoundBox.ZMin, 8.0, 40.0, App.Vector(0, 0, 1)),
             6.0,
         ),
     ]
