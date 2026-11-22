@@ -1,0 +1,254 @@
+"""FreeCAD GUI Animation Macro for gimbal_edf_50mm.FCStd and black_panther_quad_edf.FCStd."""
+
+import math
+import FreeCAD as App
+import FreeCADGui as Gui
+
+try:
+    from PySide6 import QtCore, QtWidgets
+except ImportError:
+    from PySide2 import QtCore, QtWidgets
+
+POD_COLORS = {
+    "EDF_Shroud": (0.35, 0.37, 0.40),
+    "EDF_Exhaust_Nozzle": (0.28, 0.25, 0.23),
+    "EDF_Rotor_11Blade": (0.25, 0.27, 0.30),
+    "Inner_Gimbal_Ring": (0.92, 0.42, 0.12),
+    "Inner_Pivot_Pins": (0.75, 0.77, 0.80),
+    "Outer_Gimbal_Ring": (0.12, 0.12, 0.14),
+    "Outer_Pivot_Pins": (0.75, 0.77, 0.80),
+    "Gimbal_Drive_Shaft": (0.78, 0.80, 0.82),
+    "Spur_Gear_Upper": (0.60, 0.62, 0.64),
+    "Spur_Gear_Lower": (0.60, 0.62, 0.64),
+    "CF_Servo_Bracket": (0.15, 0.16, 0.18),
+    "Bracket_Screws": (0.82, 0.84, 0.86),
+    "Servo_Yaw_SG90": (0.10, 0.35, 0.85),
+    "Servo_Pitch_SG90": (0.10, 0.35, 0.85),
+}
+
+FRAME_COLORS = {
+    "Panther_Fuselage": (0.08, 0.08, 0.10),
+    "Panther_Accent_Trim": (0.92, 0.42, 0.12),
+    "Panther_Landing_Skids": (0.12, 0.12, 0.14),
+    "Panther_Arm_FL": (0.10, 0.10, 0.12),
+    "Panther_Arm_FR": (0.10, 0.10, 0.12),
+    "Panther_Arm_RL": (0.10, 0.10, 0.12),
+    "Panther_Arm_RR": (0.10, 0.10, 0.12),
+}
+
+POD_GROUPS = {
+    "": App.Vector(0, 0, 0),
+    "FL_": App.Vector(195.0, 195.0, 15.0),
+    "FR_": App.Vector(195.0, -195.0, 15.0),
+    "RL_": App.Vector(-195.0, 195.0, 15.0),
+    "RR_": App.Vector(-195.0, -195.0, 15.0),
+}
+
+
+def _apply_visuals(doc):
+    for obj in doc.Objects:
+        if hasattr(obj, "Visibility"):
+            obj.Visibility = True
+        if hasattr(obj, "ViewObject") and obj.ViewObject is not None:
+            obj.ViewObject.Visibility = True
+            obj.ViewObject.show()
+
+    for name, color in FRAME_COLORS.items():
+        obj = doc.getObject(name)
+        if obj is not None and hasattr(obj, "ViewObject") and obj.ViewObject is not None:
+            obj.ViewObject.ShapeColor = color
+
+    for prefix in POD_GROUPS:
+        for base_name, color in POD_COLORS.items():
+            obj = doc.getObject(f"{prefix}{base_name}")
+            if obj is not None and hasattr(obj, "ViewObject") and obj.ViewObject is not None:
+                obj.ViewObject.ShapeColor = color
+
+    view = Gui.ActiveDocument.ActiveView if Gui.ActiveDocument else None
+    if view is not None:
+        view.viewIsometric()
+        view.fitAll()
+    else:
+        Gui.SendMsgToActiveView("ViewFit")
+
+
+class GimbalAnimator(QtWidgets.QDialog):
+    """Floating controller to animate 1 or 4 gimbaled EDFs and spinning rotors."""
+
+    def __init__(self, doc, parent=None):
+        super().__init__(parent)
+        self.doc = doc
+        self.t = 0.0
+        self.rotor_deg = 0.0
+        self.running = True
+        self.active_pods = [
+            (prefix, center)
+            for prefix, center in POD_GROUPS.items()
+            if doc.getObject(f"{prefix}EDF_Shroud") is not None
+        ]
+        self.base_placements = {}
+        for prefix, _ in self.active_pods:
+            for name in (
+                "Outer_Gimbal_Ring",
+                "Outer_Pivot_Pins",
+                "Gimbal_Drive_Shaft",
+                "Spur_Gear_Upper",
+                "Spur_Gear_Lower",
+                "Servo_Pitch_SG90",
+                "Inner_Gimbal_Ring",
+                "Inner_Pivot_Pins",
+                "EDF_Shroud",
+                "EDF_Exhaust_Nozzle",
+                "EDF_Rotor_11Blade",
+            ):
+                obj = doc.getObject(f"{prefix}{name}")
+                if obj is not None:
+                    self.base_placements[f"{prefix}{name}"] = obj.Placement.copy()
+
+        self.setWindowTitle("Gimbal EDF Animation")
+        self.setWindowFlags(self.windowFlags() | QtCore.Qt.WindowStaysOnTopHint)
+        self.resize(260, 130)
+
+        layout = QtWidgets.QVBoxLayout(self)
+        self.status_label = QtWidgets.QLabel(f"Status: Running ({len(self.active_pods)} pod(s))")
+        layout.addWidget(self.status_label)
+
+        self.speed_slider = QtWidgets.QSlider(QtCore.Qt.Horizontal)
+        self.speed_slider.setRange(1, 30)
+        self.speed_slider.setValue(10)
+        layout.addWidget(QtWidgets.QLabel("Animation Speed:"))
+        layout.addWidget(self.speed_slider)
+
+        btn_row = QtWidgets.QHBoxLayout()
+        self.btn_toggle = QtWidgets.QPushButton("Pause")
+        self.btn_reset = QtWidgets.QPushButton("Reset")
+        btn_row.addWidget(self.btn_toggle)
+        btn_row.addWidget(self.btn_reset)
+        layout.addLayout(btn_row)
+
+        self.btn_toggle.clicked.connect(self.toggle)
+        self.btn_reset.clicked.connect(self.reset_pose)
+
+        self.timer = QtCore.QTimer(self)
+        self.timer.timeout.connect(self.step)
+        self.timer.start(80)
+
+    def _set_placement(self, name, placement):
+        obj = self.doc.getObject(name)
+        if obj is not None:
+            obj.Placement = placement
+
+    def step(self):
+        if not self.running or self.doc is None:
+            return
+        try:
+            self._step_inner()
+        except Exception:
+            import os, traceback
+            log_path = os.path.join(App.getUserAppDataDir(), "gimbal_anim_debug.log")
+            with open(log_path, "a", encoding="utf-8") as lf:
+                lf.write("STEP ERROR:\n" + traceback.format_exc() + "\n")
+            self.running = False
+
+    def _step_inner(self):
+        if not hasattr(self, "_logged_first_step"):
+            import os
+            self._logged_first_step = True
+            log_path = os.path.join(App.getUserAppDataDir(), "gimbal_anim_debug.log")
+            with open(log_path, "a", encoding="utf-8") as lf:
+                lf.write(f"First step() running on {len(self.active_pods)} pods\n")
+        speed = self.speed_slider.value() / 10.0
+        self.t += 0.05 * speed
+        self.rotor_deg = (self.rotor_deg + 28.0 * speed) % 360.0
+
+        for idx, (prefix, c) in enumerate(self.active_pods):
+            phase = idx * 0.45
+            yaw_deg = 18.0 * math.sin(self.t + phase)
+            pitch_deg = 14.0 * math.sin(self.t * 1.4 + phase)
+
+            if prefix == "":
+                # Single-unit horizontal orientation (+X thrust)
+                ax_outer = App.Vector(0, 0, 1)
+                ax_inner = App.Vector(0, 1, 0)
+                ax_rotor = App.Vector(1, 0, 0)
+            else:
+                # Quad VTOL orientation (+Z intake, -Z exhaust, servo bracket inward)
+                inward = App.Vector(-c.x, -c.y, 0)
+                inward.normalize()
+                tangent = App.Vector(-inward.y, inward.x, 0)
+                ax_outer = inward
+                ax_inner = tangent
+                ax_rotor = App.Vector(0, 0, 1)
+
+            r_outer = App.Rotation(ax_outer, yaw_deg)
+            r_inner = r_outer.multiply(App.Rotation(ax_inner, pitch_deg))
+            r_rotor = r_inner.multiply(App.Rotation(ax_rotor, self.rotor_deg))
+
+            def _apply_rot(obj_name, r_delta):
+                base_p = self.base_placements.get(obj_name)
+                if base_p is None:
+                    return
+                new_pos = c.add(r_delta.multVec(base_p.Base.sub(c)))
+                new_rot = r_delta.multiply(base_p.Rotation)
+                self._set_placement(obj_name, App.Placement(new_pos, new_rot))
+
+            for name in (
+                "Outer_Gimbal_Ring",
+                "Outer_Pivot_Pins",
+                "Gimbal_Drive_Shaft",
+                "Spur_Gear_Upper",
+                "Spur_Gear_Lower",
+                "Servo_Pitch_SG90",
+            ):
+                _apply_rot(f"{prefix}{name}", r_outer)
+
+            for name in (
+                "Inner_Gimbal_Ring",
+                "Inner_Pivot_Pins",
+                "EDF_Shroud",
+                "EDF_Exhaust_Nozzle",
+            ):
+                _apply_rot(f"{prefix}{name}", r_inner)
+
+            _apply_rot(f"{prefix}EDF_Rotor_11Blade", r_rotor)
+
+    def toggle(self):
+        self.running = not self.running
+        self.btn_toggle.setText("Pause" if self.running else "Play")
+        self.status_label.setText(
+            f"Status: {'Running' if self.running else 'Paused'} ({len(self.active_pods)} pod(s))"
+        )
+
+    def reset_pose(self):
+        self.t = 0.0
+        self.rotor_deg = 0.0
+        for obj_name, base_p in self.base_placements.items():
+            self._set_placement(obj_name, base_p)
+
+    def closeEvent(self, event):
+        self.timer.stop()
+        super().closeEvent(event)
+
+
+def launch_animation():
+    import os
+    log_path = os.path.join(App.getUserAppDataDir(), "gimbal_anim_debug.log")
+    def _dlog(m):
+        with open(log_path, "a", encoding="utf-8") as lf:
+            lf.write(m + "\n")
+
+    doc = App.ActiveDocument
+    if doc is None:
+        QtWidgets.QMessageBox.warning(None, "No Document", "Open a gimbal EDF document first.")
+        return
+    _dlog("1. before _apply_visuals")
+    _apply_visuals(doc)
+    _dlog("2. after _apply_visuals")
+    Gui._gimbal_animator = GimbalAnimator(doc)
+    _dlog("3. after GimbalAnimator()")
+    Gui._gimbal_animator.show()
+    _dlog("4. after show()")
+
+
+if __name__ in ("__main__", "AnimateGimbalEDF"):
+    launch_animation()
