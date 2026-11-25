@@ -39,7 +39,13 @@ def render_part_png(fcstd_path):
 
     nodes = mesh_obj.FemMesh.Nodes
     node_ids = res.NodeNumbers if res.NodeNumbers else sorted(nodes.keys())
-    pts = np.array([[nodes[nid].x, nodes[nid].y, nodes[nid].z] for nid in node_ids])
+    if not node_ids or not res.vonMises or not res.DisplacementLengths:
+        App.closeDocument(doc.Name)
+        return None
+    pts = np.array([[nodes[nid].x, nodes[nid].y, nodes[nid].z] for nid in node_ids if nid in nodes])
+    if len(pts) == 0:
+        App.closeDocument(doc.Name)
+        return None
     vm = np.array(res.vonMises)
     disp = np.array(res.DisplacementLengths)
 

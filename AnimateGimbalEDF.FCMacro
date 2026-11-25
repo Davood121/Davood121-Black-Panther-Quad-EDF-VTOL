@@ -13,6 +13,8 @@ POD_COLORS = {
     "EDF_Shroud": (0.35, 0.37, 0.40),
     "EDF_Exhaust_Nozzle": (0.28, 0.25, 0.23),
     "EDF_Rotor_11Blade": (0.25, 0.27, 0.30),
+    "EDF_Mount_Bolts": (0.82, 0.84, 0.86),
+    "Innermost_Gimbal_Ring": (0.55, 0.68, 0.82),
     "Inner_Gimbal_Ring": (0.92, 0.42, 0.12),
     "Inner_Pivot_Pins": (0.75, 0.77, 0.80),
     "Outer_Gimbal_Ring": (0.12, 0.12, 0.14),
@@ -24,10 +26,17 @@ POD_COLORS = {
     "Bracket_Screws": (0.82, 0.84, 0.86),
     "Servo_Yaw_SG90": (0.10, 0.35, 0.85),
     "Servo_Pitch_SG90": (0.10, 0.35, 0.85),
+    "Pitch_Pushrod": (0.82, 0.84, 0.88),
 }
 
 FRAME_COLORS = {
+    "Panther_X_Chassis": (0.10, 0.11, 0.13),
+    "Panther_Battery_Bay": (0.09, 0.10, 0.12),
+    "Panther_Electronics_Bay": (0.11, 0.12, 0.15),
+    "Panther_Top_Cover": (0.13, 0.14, 0.17),
+    "Panther_Top_Edge_Lights": (0.15, 0.88, 1.00),
     "Panther_Fuselage": (0.08, 0.08, 0.10),
+    "Panther_Canopy": (0.12, 0.13, 0.15),
     "Panther_Accent_Trim": (0.92, 0.42, 0.12),
     "Panther_Landing_Skids": (0.12, 0.12, 0.14),
     "Panther_Arm_FL": (0.10, 0.10, 0.12),
@@ -44,8 +53,28 @@ POD_GROUPS = {
     "RR_": App.Vector(-195.0, -195.0, 15.0),
 }
 
+V2_POD_GROUPS = {
+    "V2_FL_": App.Vector(205.0, 205.0, 18.0),
+    "V2_FR_": App.Vector(205.0, -205.0, 18.0),
+    "V2_RL_": App.Vector(-205.0, 205.0, 18.0),
+    "V2_RR_": App.Vector(-205.0, -205.0, 18.0),
+}
 
-def _apply_visuals(doc):
+SHELL_PARTS = {
+    "EDF_Shroud",
+    "EDF_Exhaust_Nozzle",
+    "Inner_Gimbal_Ring",
+    "Outer_Gimbal_Ring",
+    "CF_Servo_Bracket",
+    "Servo_Yaw_SG90",
+    "Servo_Pitch_SG90",
+    "Panther_Battery_Bay",
+    "Panther_Electronics_Bay",
+    "Panther_Top_Cover",
+}
+
+
+def _apply_visuals(doc, transparent=True):
     for obj in doc.Objects:
         if hasattr(obj, "Visibility"):
             obj.Visibility = True
@@ -53,23 +82,41 @@ def _apply_visuals(doc):
             obj.ViewObject.Visibility = True
             obj.ViewObject.show()
 
-    for name, color in FRAME_COLORS.items():
-        obj = doc.getObject(name)
-        if obj is not None and hasattr(obj, "ViewObject") and obj.ViewObject is not None:
-            obj.ViewObject.ShapeColor = color
-
-    for prefix in POD_GROUPS:
-        for base_name, color in POD_COLORS.items():
-            obj = doc.getObject(f"{prefix}{base_name}")
+    if doc.getObject("V2_Fuselage") is not None:
+        for obj in doc.Objects:
+            if not (hasattr(obj, "ViewObject") and obj.ViewObject is not None):
+                continue
+            n = obj.Name
+            if "Orange" in n or "Cooling" in n:
+                obj.ViewObject.ShapeColor = (0.94, 0.44, 0.12)
+            elif "Servo_Inline" in n:
+                obj.ViewObject.ShapeColor = (0.10, 0.35, 0.85)
+            elif "Pushrod" in n:
+                obj.ViewObject.ShapeColor = (0.82, 0.84, 0.88)
+            elif "Shroud" in n or "Nozzle" in n or "Rotor" in n:
+                obj.ViewObject.ShapeColor = (0.32, 0.34, 0.38)
+            else:
+                obj.ViewObject.ShapeColor = (0.12, 0.13, 0.15)
+            is_shell = any(s in n for s in ("V2_Fuselage", "EDF_Shroud", "EDF_Nozzle"))
+            obj.ViewObject.Transparency = 65 if (transparent and is_shell) else 0
+    else:
+        for name, color in FRAME_COLORS.items():
+            obj = doc.getObject(name)
             if obj is not None and hasattr(obj, "ViewObject") and obj.ViewObject is not None:
                 obj.ViewObject.ShapeColor = color
+                obj.ViewObject.Transparency = 70 if (transparent and name in SHELL_PARTS) else 0
+
+        for prefix in POD_GROUPS:
+            for base_name, color in POD_COLORS.items():
+                obj = doc.getObject(f"{prefix}{base_name}")
+                if obj is not None and hasattr(obj, "ViewObject") and obj.ViewObject is not None:
+                    obj.ViewObject.ShapeColor = color
+                    obj.ViewObject.Transparency = 70 if (transparent and base_name in SHELL_PARTS) else 0
 
     view = Gui.ActiveDocument.ActiveView if Gui.ActiveDocument else None
     if view is not None:
         view.viewIsometric()
-        view.fitAll()
-    else:
-        Gui.SendMsgToActiveView("ViewFit")
+    QtCore.QTimer.singleShot(250, lambda: Gui.SendMsgToActiveView("ViewFit"))
 
 
 class GimbalAnimator(QtWidgets.QDialog):
@@ -80,37 +127,69 @@ class GimbalAnimator(QtWidgets.QDialog):
         self.doc = doc
         self.t = 0.0
         self.rotor_deg = 0.0
-        self.running = True
-        self.active_pods = [
-            (prefix, center)
-            for prefix, center in POD_GROUPS.items()
-            if doc.getObject(f"{prefix}EDF_Shroud") is not None
-        ]
-        self.base_placements = {}
-        for prefix, _ in self.active_pods:
-            for name in (
-                "Outer_Gimbal_Ring",
-                "Outer_Pivot_Pins",
-                "Gimbal_Drive_Shaft",
-                "Spur_Gear_Upper",
-                "Spur_Gear_Lower",
-                "Servo_Pitch_SG90",
-                "Inner_Gimbal_Ring",
-                "Inner_Pivot_Pins",
-                "EDF_Shroud",
-                "EDF_Exhaust_Nozzle",
-                "EDF_Rotor_11Blade",
+        self.running = False
+        self.is_v2 = doc.getObject("V2_Fuselage") is not None
+        if self.is_v2:
+            self.active_pods = [
+                (prefix, center)
+                for prefix, center in V2_POD_GROUPS.items()
+                if doc.getObject(f"{prefix}EDF_Shroud") is not None
+            ]
+            v2_names = ("Gimbal_Ring", "EDF_Shroud", "EDF_Nozzle", "Orange_Rims", "EDF_Rotor", "Pushrod")
+            self.base_placements = {}
+            for prefix, _ in self.active_pods:
+                for name in v2_names:
+                    obj = doc.getObject(f"{prefix}{name}")
+                    if obj is not None:
+                        self.base_placements[f"{prefix}{name}"] = obj.Placement.copy()
+        else:
+            self.active_pods = [
+                (prefix, center)
+                for prefix, center in POD_GROUPS.items()
+                if doc.getObject(f"{prefix}EDF_Shroud") is not None
+            ]
+            self.base_placements = {}
+            for prefix, _ in self.active_pods:
+                for name in (
+                    "Outer_Gimbal_Ring",
+                    "Outer_Pivot_Pins",
+                    "Gimbal_Drive_Shaft",
+                    "Spur_Gear_Upper",
+                    "Spur_Gear_Lower",
+                    "Servo_Yaw_SG90",
+                    "Inner_Gimbal_Ring",
+                    "Innermost_Gimbal_Ring",
+                    "Inner_Pivot_Pins",
+                    "EDF_Shroud",
+                    "EDF_Exhaust_Nozzle",
+                    "EDF_Rotor_11Blade",
+                    "EDF_Mount_Bolts",
+                ):
+                    obj = doc.getObject(f"{prefix}{name}")
+                    if obj is not None:
+                        self.base_placements[f"{prefix}{name}"] = obj.Placement.copy()
+                if prefix:
+                    arm_obj = doc.getObject(f"Panther_Arm_{prefix.rstrip('_')}")
+                    if arm_obj is not None:
+                        self.base_placements[arm_obj.Name] = arm_obj.Placement.copy()
+            for cname in (
+                "Panther_Landing_Skids",
+                "Panther_Battery_Bay",
+                "Panther_X_Chassis",
+                "Panther_Electronics_Bay",
+                "Panther_Top_Edge_Lights",
+                "Panther_Top_Cover",
             ):
-                obj = doc.getObject(f"{prefix}{name}")
-                if obj is not None:
-                    self.base_placements[f"{prefix}{name}"] = obj.Placement.copy()
+                cobj = doc.getObject(cname)
+                if cobj is not None:
+                    self.base_placements[cname] = cobj.Placement.copy()
 
         self.setWindowTitle("Gimbal EDF Animation")
         self.setWindowFlags(self.windowFlags() | QtCore.Qt.WindowStaysOnTopHint)
         self.resize(260, 130)
 
         layout = QtWidgets.QVBoxLayout(self)
-        self.status_label = QtWidgets.QLabel(f"Status: Running ({len(self.active_pods)} pod(s))")
+        self.status_label = QtWidgets.QLabel(f"Status: Paused ({len(self.active_pods)} pod(s))")
         layout.addWidget(self.status_label)
 
         self.speed_slider = QtWidgets.QSlider(QtCore.Qt.Horizontal)
@@ -119,19 +198,42 @@ class GimbalAnimator(QtWidgets.QDialog):
         layout.addWidget(QtWidgets.QLabel("Animation Speed:"))
         layout.addWidget(self.speed_slider)
 
+        self.explode_slider = QtWidgets.QSlider(QtCore.Qt.Horizontal)
+        self.explode_slider.setRange(0, 100)
+        self.explode_slider.setValue(0)
+        layout.addWidget(QtWidgets.QLabel("Exploded View (0% - 100%):"))
+        layout.addWidget(self.explode_slider)
+
         btn_row = QtWidgets.QHBoxLayout()
-        self.btn_toggle = QtWidgets.QPushButton("Pause")
+        self.btn_toggle = QtWidgets.QPushButton("Play")
         self.btn_reset = QtWidgets.QPushButton("Reset")
+        self.btn_xray = QtWidgets.QPushButton("X-Ray: OFF")
+        self.btn_iso = QtWidgets.QPushButton("1-Pod: OFF")
+        self.btn_explode = QtWidgets.QPushButton("Explode")
+        self.btn_props = QtWidgets.QPushButton("Properties")
+        self.transparent = False
+        self.isolate_fl = False
         btn_row.addWidget(self.btn_toggle)
         btn_row.addWidget(self.btn_reset)
+        btn_row.addWidget(self.btn_xray)
+        btn_row.addWidget(self.btn_iso)
+        btn_row.addWidget(self.btn_explode)
+        btn_row.addWidget(self.btn_props)
         layout.addLayout(btn_row)
 
         self.btn_toggle.clicked.connect(self.toggle)
         self.btn_reset.clicked.connect(self.reset_pose)
+        self.btn_xray.clicked.connect(self.toggle_xray)
+        self.btn_iso.clicked.connect(self.toggle_isolate)
+        self.btn_explode.clicked.connect(self.toggle_explode)
+        self.explode_slider.valueChanged.connect(self.on_explode_changed)
+        self.btn_props.clicked.connect(self.open_property_manager)
+        if any(o.Name.startswith("FL_") for o in doc.Objects):
+            self._apply_isolation()
 
         self.timer = QtCore.QTimer(self)
         self.timer.timeout.connect(self.step)
-        self.timer.start(80)
+        self.timer.start(150)
 
     def _set_placement(self, name, placement):
         obj = self.doc.getObject(name)
@@ -140,6 +242,8 @@ class GimbalAnimator(QtWidgets.QDialog):
 
     def step(self):
         if not self.running or self.doc is None:
+            return
+        if hasattr(self, "explode_slider") and self.explode_slider.value() > 0:
             return
         try:
             self._step_inner()
@@ -166,31 +270,71 @@ class GimbalAnimator(QtWidgets.QDialog):
             yaw_deg = 18.0 * math.sin(self.t + phase)
             pitch_deg = 14.0 * math.sin(self.t * 1.4 + phase)
 
+            def _apply_rot(obj_name, r_delta, extra_shift=App.Vector(0, 0, 0)):
+                base_p = self.base_placements.get(obj_name)
+                if base_p is None:
+                    return
+                new_pos = c.add(r_delta.multVec(base_p.Base.sub(c))).add(extra_shift)
+                new_rot = r_delta.multiply(base_p.Rotation)
+                self._set_placement(obj_name, App.Placement(new_pos, new_rot))
+
+            if self.is_v2:
+                inward = App.Vector(-c.x, -c.y, 0)
+                inward.normalize()
+                tangent = App.Vector(-inward.y, inward.x, 0)
+                tangent = App.Vector(-inward.y, inward.x, 0)
+
+                r_ring = App.Rotation(tangent, pitch_deg)
+                r_edf = r_ring.multiply(App.Rotation(inward, yaw_deg * 0.7))
+                r_rotor = r_edf.multiply(App.Rotation(App.Vector(0, 0, 1), self.rotor_deg))
+
+                _apply_rot(f"{prefix}Gimbal_Ring", r_ring)
+                for part in ("EDF_Shroud", "EDF_Nozzle", "Orange_Rims"):
+                    _apply_rot(f"{prefix}{part}", r_edf)
+                _apply_rot(f"{prefix}EDF_Rotor", r_rotor)
+                rod_shift = inward.multiply(4.0 * math.sin(self.t * 1.4 + phase))
+                _apply_rot(f"{prefix}Pushrod", App.Rotation(), extra_shift=rod_shift)
+                continue
+
             if prefix == "":
                 # Single-unit horizontal orientation (+X thrust)
                 ax_outer = App.Vector(0, 0, 1)
                 ax_inner = App.Vector(0, 1, 0)
                 ax_rotor = App.Vector(1, 0, 0)
             else:
-                # Quad VTOL orientation (+Z intake, -Z exhaust, servo bracket inward)
+                # Quad VTOL: Outer_Gimbal_Ring is permanently fused to arm;
+                # Inner_Gimbal_Ring + Innermost_Gimbal_Ring + EDF rotate around inward (driven by arm Servo_Yaw_SG90)
                 inward = App.Vector(-c.x, -c.y, 0)
                 inward.normalize()
                 tangent = App.Vector(-inward.y, inward.x, 0)
-                ax_outer = inward
-                ax_inner = tangent
-                ax_rotor = App.Vector(0, 0, 1)
+
+                r_inner = App.Rotation(inward, yaw_deg)
+                r_edf = r_inner
+                r_rotor = r_edf.multiply(App.Rotation(App.Vector(0, 0, 1), self.rotor_deg))
+
+                for name in ("Inner_Gimbal_Ring", "Inner_Pivot_Pins", "Gimbal_Drive_Shaft", "Spur_Gear_Upper"):
+                    _apply_rot(f"{prefix}{name}", r_inner)
+                gear_obj_name = f"{prefix}Spur_Gear_Lower"
+                base_g = self.base_placements.get(gear_obj_name)
+                if base_g is not None:
+                    side = 1.0 if c.y >= 0 else -1.0
+                    c_pinion = c.add(tangent.multiply(11.0 * side))
+                    r_pinion = App.Rotation(inward, -yaw_deg)
+                    self._set_placement(
+                        gear_obj_name,
+                        App.Placement(
+                            c_pinion.add(r_pinion.multVec(base_g.Base.sub(c_pinion))),
+                            r_pinion.multiply(base_g.Rotation),
+                        ),
+                    )
+                for name in ("Innermost_Gimbal_Ring", "EDF_Shroud", "EDF_Exhaust_Nozzle", "EDF_Mount_Bolts"):
+                    _apply_rot(f"{prefix}{name}", r_edf)
+                _apply_rot(f"{prefix}EDF_Rotor_11Blade", r_rotor)
+                continue
 
             r_outer = App.Rotation(ax_outer, yaw_deg)
-            r_inner = r_outer.multiply(App.Rotation(ax_inner, pitch_deg))
+            r_inner = r_outer
             r_rotor = r_inner.multiply(App.Rotation(ax_rotor, self.rotor_deg))
-
-            def _apply_rot(obj_name, r_delta):
-                base_p = self.base_placements.get(obj_name)
-                if base_p is None:
-                    return
-                new_pos = c.add(r_delta.multVec(base_p.Base.sub(c)))
-                new_rot = r_delta.multiply(base_p.Rotation)
-                self._set_placement(obj_name, App.Placement(new_pos, new_rot))
 
             for name in (
                 "Outer_Gimbal_Ring",
@@ -212,6 +356,34 @@ class GimbalAnimator(QtWidgets.QDialog):
 
             _apply_rot(f"{prefix}EDF_Rotor_11Blade", r_rotor)
 
+    def _apply_isolation(self):
+        for obj in self.doc.Objects:
+            in_fl = obj.Name.startswith("FL_") or obj.Name == "Panther_Arm_FL"
+            keep = in_fl if self.isolate_fl else True
+            if hasattr(obj, "Visibility"):
+                obj.Visibility = keep
+            if hasattr(obj, "ViewObject") and obj.ViewObject is not None:
+                obj.ViewObject.Visibility = keep
+                if keep:
+                    obj.ViewObject.show()
+                else:
+                    obj.ViewObject.hide()
+        view = Gui.ActiveDocument.ActiveView if Gui.ActiveDocument else None
+        if view is not None:
+            view.fitAll()
+
+    def toggle_isolate(self):
+        self.isolate_fl = not self.isolate_fl
+        self.btn_iso.setText("1-Pod: ON" if self.isolate_fl else "1-Pod: OFF")
+        self._apply_isolation()
+
+    def toggle_xray(self):
+        self.transparent = not self.transparent
+        self.btn_xray.setText("X-Ray: ON" if self.transparent else "X-Ray: OFF")
+        _apply_visuals(self.doc, transparent=self.transparent)
+        if any(o.Name.startswith("FL_") for o in self.doc.Objects):
+            self._apply_isolation()
+
     def toggle(self):
         self.running = not self.running
         self.btn_toggle.setText("Pause" if self.running else "Play")
@@ -222,8 +394,97 @@ class GimbalAnimator(QtWidgets.QDialog):
     def reset_pose(self):
         self.t = 0.0
         self.rotor_deg = 0.0
+        if hasattr(self, "explode_slider") and self.explode_slider.value() != 0:
+            self.explode_slider.setValue(0)
         for obj_name, base_p in self.base_placements.items():
             self._set_placement(obj_name, base_p)
+
+    def toggle_explode(self):
+        self.explode_slider.setValue(0 if self.explode_slider.value() > 0 else 100)
+        QtCore.QTimer.singleShot(150, lambda: Gui.SendMsgToActiveView("ViewFit"))
+
+    def on_explode_changed(self, val):
+        f = val / 100.0
+        center_z = {
+            "Panther_Landing_Skids": -75.0,
+            "Panther_Battery_Bay": -40.0,
+            "Panther_X_Chassis": 0.0,
+            "Panther_Electronics_Bay": 40.0,
+            "Panther_Top_Edge_Lights": 68.0,
+            "Panther_Top_Cover": 95.0,
+        }
+        for cname, dz in center_z.items():
+            bp = self.base_placements.get(cname)
+            if bp is not None:
+                self._set_placement(cname, App.Placement(bp.Base.add(App.Vector(0, 0, dz * f)), bp.Rotation))
+        for prefix, c in self.active_pods:
+            if prefix == "":
+                continue
+            inward = App.Vector(-c.x, -c.y, 0)
+            inward.normalize()
+            outward = inward.multiply(-1.0)
+            pod_shifts = {
+                f"Panther_Arm_{prefix.rstrip('_')}": outward.multiply(55.0),
+                f"{prefix}Servo_Yaw_SG90": outward.multiply(55.0).add(App.Vector(0, 0, -28.0)),
+                f"{prefix}Spur_Gear_Lower": outward.multiply(55.0).add(App.Vector(0, 0, 24.0)),
+                f"{prefix}Spur_Gear_Upper": outward.multiply(28.0).add(App.Vector(0, 0, 24.0)),
+                f"{prefix}Gimbal_Drive_Shaft": outward.multiply(18.0),
+                f"{prefix}Outer_Pivot_Pins": outward.multiply(-20.0),
+                f"{prefix}Inner_Gimbal_Ring": outward.multiply(65.0),
+                f"{prefix}Innermost_Gimbal_Ring": outward.multiply(65.0).add(App.Vector(0, 0, 34.0)),
+                f"{prefix}Inner_Pivot_Pins": outward.multiply(65.0).add(App.Vector(0, 0, 52.0)),
+                f"{prefix}EDF_Mount_Bolts": outward.multiply(65.0).add(App.Vector(0, 0, 70.0)),
+                f"{prefix}EDF_Shroud": outward.multiply(65.0).add(App.Vector(0, 0, 98.0)),
+                f"{prefix}EDF_Rotor_11Blade": outward.multiply(65.0).add(App.Vector(0, 0, 148.0)),
+                f"{prefix}EDF_Exhaust_Nozzle": outward.multiply(65.0).add(App.Vector(0, 0, -58.0)),
+            }
+            for oname, vec in pod_shifts.items():
+                bp = self.base_placements.get(oname)
+                if bp is not None:
+                    self._set_placement(oname, App.Placement(bp.Base.add(vec.multiply(f)), bp.Rotation))
+
+    def open_property_manager(self):
+        dlg = QtWidgets.QDialog(self)
+        dlg.setWindowTitle("Property Manager — Part Dimensions & Visibility")
+        dlg.resize(620, 460)
+        vbox = QtWidgets.QVBoxLayout(dlg)
+        table = QtWidgets.QTableWidget(len(self.doc.Objects), 4, dlg)
+        table.setHorizontalHeaderLabels(["Part Name", "Size X × Y × Z (mm)", "Volume (mm³)", "Visible"])
+        table.horizontalHeader().setStretchLastSection(True)
+        table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+        for r, obj in enumerate(self.doc.Objects):
+            table.setItem(r, 0, QtWidgets.QTableWidgetItem(obj.Name))
+            if hasattr(obj, "Shape") and obj.Shape is not None:
+                bb = obj.Shape.BoundBox
+                sz = f"{bb.XLength:.1f} × {bb.YLength:.1f} × {bb.ZLength:.1f}"
+                vol = f"{obj.Shape.Volume:,.1f}"
+            else:
+                sz, vol = "-", "-"
+            table.setItem(r, 1, QtWidgets.QTableWidgetItem(sz))
+            table.setItem(r, 2, QtWidgets.QTableWidgetItem(vol))
+            chk = QtWidgets.QCheckBox()
+            chk.setChecked(bool(getattr(obj, "Visibility", True)))
+            def _on_toggle(state, o=obj):
+                vis = bool(state)
+                if hasattr(o, "Visibility"):
+                    o.Visibility = vis
+                if hasattr(o, "ViewObject") and o.ViewObject is not None:
+                    o.ViewObject.Visibility = vis
+                    o.ViewObject.show() if vis else o.ViewObject.hide()
+            chk.stateChanged.connect(_on_toggle)
+            table.setCellWidget(r, 3, chk)
+        def _on_select():
+            rows = table.selectionModel().selectedRows()
+            if not rows:
+                return
+            name = table.item(rows[0].row(), 0).text()
+            Gui.Selection.clearSelection()
+            Gui.Selection.addSelection(self.doc.Name, name)
+        table.itemSelectionChanged.connect(_on_select)
+        table.resizeColumnsToContents()
+        vbox.addWidget(table)
+        dlg.show()
+        self._prop_dlg = dlg
 
     def closeEvent(self, event):
         self.timer.stop()
@@ -242,7 +503,7 @@ def launch_animation():
         QtWidgets.QMessageBox.warning(None, "No Document", "Open a gimbal EDF document first.")
         return
     _dlog("1. before _apply_visuals")
-    _apply_visuals(doc)
+    _apply_visuals(doc, transparent=False)
     _dlog("2. after _apply_visuals")
     Gui._gimbal_animator = GimbalAnimator(doc)
     _dlog("3. after GimbalAnimator()")

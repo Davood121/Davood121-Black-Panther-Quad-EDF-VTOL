@@ -69,20 +69,23 @@ def run_part_fem(name, shape, youngs_mpa, poisson, yield_mpa, fixed_spec, load_s
 
     load_axis, load_target, load_tol, force_n, dir_vec = load_spec
     load_faces = _find_faces_by_bbox(shape, load_axis, load_target, load_tol)
+    dir_line = doc.addObject("Part::Line", f"{name}_DirLine")
+    dir_line.X1, dir_line.Y1, dir_line.Z1 = 0.0, 0.0, 0.0
+    dir_line.X2, dir_line.Y2, dir_line.Z2 = float(dir_vec[0]) * 10.0, float(dir_vec[1]) * 10.0, float(dir_vec[2]) * 10.0
+    doc.recompute()
+
     force = ObjectsFem.makeConstraintForce(doc, "Force")
     force.References = [(part_obj, load_faces)]
     force.Force = f"{force_n} N"
     force.Reversed = False
-    # Set direction via a tiny edge/normal or default; use DirectionVector if supported
-    if hasattr(force, "DirectionVector"):
-        force.DirectionVector = dir_vec
+    force.Direction = (dir_line, ["Edge1"])
     analysis.addObject(force)
 
     mesh_obj = ObjectsFem.makeMeshGmsh(doc, "FEMMeshGmsh")
     mesh_obj.Shape = part_obj
-    mesh_obj.CharacteristicLengthMax = mesh_max
+    mesh_obj.CharacteristicLengthMax = max(2.0, mesh_max * 0.75)
     mesh_obj.CharacteristicLengthMin = max(0.8, mesh_max / 4.0)
-    mesh_obj.ElementOrder = "2nd"
+    mesh_obj.ElementOrder = "1st"
     analysis.addObject(mesh_obj)
     doc.recompute()
 
@@ -133,16 +136,17 @@ def run_part_fem(name, shape, youngs_mpa, poisson, yield_mpa, fixed_spec, load_s
 
 
 def main():
-    src_path = os.path.join(SCRIPT_DIR, "black_panther_quad_edf.FCStd")
+    src_path = os.path.join(SCRIPT_DIR, "black_panther_a2212_quad.FCStd")
     src_doc = App.openDocument(src_path)
 
-    # Extract clean shapes (reset placement to local where needed)
+    # Extract clean shapes from current model
     arm_shape = src_doc.getObject("Panther_Arm_FL").Shape.copy()
+    chassis_shape = src_doc.getObject("Panther_X_Chassis").Shape.copy()
     skid_shape = src_doc.getObject("Panther_Landing_Skids").Shape.copy()
-    bracket_shape = src_doc.getObject("FL_CF_Servo_Bracket").Shape.copy()
     inner_shape = src_doc.getObject("FL_Inner_Gimbal_Ring").Shape.copy()
-    outer_shape = src_doc.getObject("FL_Outer_Gimbal_Ring").Shape.copy()
+    innermost_shape = src_doc.getObject("FL_Innermost_Gimbal_Ring").Shape.copy()
     shaft_shape = src_doc.getObject("FL_Gimbal_Drive_Shaft").Shape.copy()
+    cradle_shape = src_doc.getObject("FL_A2212_Cradle").Shape.copy()
     App.closeDocument(src_doc.Name)
 
     # Compute bounding-box targets dynamically for each part
@@ -158,14 +162,14 @@ def main():
             6.0,
         ),
         (
-            "CF_Servo_Bracket",
-            bracket_shape,
-            70000.0,
-            0.30,
-            300.0,
-            ("z", bracket_shape.BoundBox.ZMin, 3.0),
-            ("z", bracket_shape.BoundBox.ZMax, 3.0, 20.0, App.Vector(0, 0, 1)),
-            3.0,
+            "Panther_X_Chassis",
+            chassis_shape,
+            2500.0,
+            0.35,
+            50.0,  # PETG / CF-Nylon
+            ("z", chassis_shape.BoundBox.ZMin, 2.0),
+            ("z", chassis_shape.BoundBox.ZMax, 2.0, 60.0, App.Vector(0, 0, -1)),
+            6.0,
         ),
         (
             "Inner_Gimbal_Ring",
@@ -178,13 +182,13 @@ def main():
             3.5,
         ),
         (
-            "Outer_Gimbal_Ring",
-            outer_shape,
+            "Innermost_Gimbal_Ring",
+            innermost_shape,
             2500.0,
             0.35,
             50.0,
-            ("z", outer_shape.BoundBox.ZMin, 4.0),
-            ("z", outer_shape.BoundBox.ZMax, 4.0, 20.0, App.Vector(0, 0, 1)),
+            ("z", innermost_shape.BoundBox.ZMin, 2.0),
+            ("z", innermost_shape.BoundBox.ZMax, 2.0, 20.0, App.Vector(0, 0, 1)),
             3.5,
         ),
         (
@@ -206,6 +210,16 @@ def main():
             ("z", skid_shape.BoundBox.ZMax, 12.0),
             ("z", skid_shape.BoundBox.ZMin, 8.0, 40.0, App.Vector(0, 0, 1)),
             6.0,
+        ),
+        (
+            "A2212_Cradle",
+            cradle_shape,
+            2500.0,
+            0.35,
+            50.0,  # PETG / PA12-CF
+            ("z", cradle_shape.BoundBox.ZMin, 3.0),
+            ("z", cradle_shape.BoundBox.ZMax, 2.0, 15.0, App.Vector(0, 0, 1)),
+            3.5,
         ),
     ]
 
