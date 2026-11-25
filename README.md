@@ -20,7 +20,7 @@
 | 12-Actuator Dual-Axis Vectoring (`±22°` Sweep) | OpenFOAM-12 3D RANS Downwash (`A2212 + 8045`) |
 | :---: | :---: |
 | ![3D Tilt-Rotor Animation](assets/black_panther_tilt_animation.gif) | ![OpenFOAM 3D Flow Animation](assets/openfoam_3d_flow_animation.gif) |
-| *4× `A2212/10T 1400KV` + `8045` props (`186.8 mm` tip clearance) on `8× MG90S` 2-axis gimbals* | *Steady $k$-$\omega$ SST actuator-disk slipstream around the `+30 mm` raised pod* |
+| *4× `A2212/10T 1400KV` + `8045` props (`186.8 mm` tip clearance) on `8× MG90S` 2-axis gimbals* | *Steady k-ω SST actuator-disk slipstream around the `+30 mm` raised pod* |
 
 ---
 
@@ -28,22 +28,22 @@
 
 ```mermaid
 flowchart LR
-    FC["Flight Controller<br/>(6-DOF Pose & Rate)"] --> ALLOC["12-to-6-DOF Wrench Allocator<br/>w = B(alpha) * T"]
-    ALLOC -->|"4x RPM Commands"| ESC["4x 30A BLHeli ESCs<br/>(3S 11.1V LiPo)"]
-    ALLOC -->|"8x Gimbal Angles (±20 deg)"| SERVO["8x MG90S Metal-Gear Servos<br/>(4x Yaw + 4x Pitch)"]
-    ESC --> MOTOR["4x A2212/10T 1400KV<br/>+ 8045 Props"]
-    SERVO --> GIMBAL["Raised (+30mm) 2-Axis Gimbals<br/>(20.78mm Arm Clearance @ ±25 deg)"]
-    MOTOR --> GYRO["Gyroscopic Precession<br/>tau_gyro = I * omega * Omega_tilt"]
-    GYRO -.->|"Orthogonal Disturbance"| SERVO
+    FC["Flight Controller (6-DOF Pose)"] --> ALLOC["12-to-6-DOF Wrench Allocator"]
+    ALLOC -->|"4x RPM"| ESC["4x 30A BLHeli ESCs (3S 11.1V)"]
+    ALLOC -->|"8x Tilt (±20 deg)"| SERVO["8x MG90S Servos (4 Yaw + 4 Pitch)"]
+    ESC --> MOTOR["4x A2212/10T 1400KV + 8045 Props"]
+    SERVO --> GIMBAL["Raised +30mm Gimbals (±25 deg Clear)"]
+    MOTOR --> GYRO["Gyroscopic Precession Torque"]
+    GYRO -.->|"Orthogonal Load"| SERVO
 ```
 
 ### Propulsion Evolution: `50 mm` EDF → `A2212/10T 1400KV + 8045`
 
 ```mermaid
 flowchart LR
-    V1["v1: 50mm 11-Blade EDF<br/>17.09 cm² annulus | 1.2-2.2 g/W<br/>High Disk Loading (556-870 kg/m²)"] --> V2["v2: Bellmouth 50mm EDF<br/>2.8mm Rolled Torus Lip<br/>Suppressed Lip Separation (71.1 m/s)"]
-    V2 --> V3["v3: A2212/10T + 8045 Open Rotor<br/>322.27 cm² Disk (18.9x Area)<br/>3.5-4.5+ g/W | >60% Less Hover Power"]
-    V3 --> V4["v4: GitHub Release (Current)<br/>+30mm Raised Cradle + Pitch_Servo_Mount<br/>Watertight FEM (solids=1) & 34-Part Print STL"]
+    V1["v1: 50mm 11-Blade EDF (17.09 cm2, 1.2-2.2 g/W)"] --> V2["v2: Bellmouth 50mm EDF (2.8mm Lip, 71.1 m/s)"]
+    V2 --> V3["v3: A2212/10T + 8045 (322.27 cm2, 3.5-4.5 g/W)"]
+    V3 --> V4["v4: GitHub Release (+30mm Riser, 8 Servos, 34-Part STL)"]
 ```
 
 ---
@@ -63,7 +63,7 @@ flowchart LR
 
 ## 2. 3D OpenFOAM-12 RANS CFD Gallery
 
-All CFD cases solve steady incompressible RANS ($k$-$\omega$ SST) via `foamRun` on `snappyHexMesh` grids exported directly from FreeCAD 1.1.4:
+All CFD cases solve steady incompressible RANS (k-ω SST) via `foamRun` on `snappyHexMesh` grids exported directly from FreeCAD 1.1.4:
 
 | Raised (`+30 mm`) `A2212 + 8045` (`21,704` cells) | `A2212 + 8045` Contours & Streamlines |
 | :---: | :---: |
