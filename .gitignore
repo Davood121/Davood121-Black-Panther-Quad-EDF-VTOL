@@ -17,6 +17,8 @@ backup data/
 .env
 cfd_case/
 cfd_case_a2212/
+cfd_case_prop_hover/
+cfd_case_prop_wind/
 print_stl/*.stl
 !print_stl/black_panther_a2212_all_printable.stl
 !print_stl/black_panther_a2212_1pod_test.stl
