@@ -74,11 +74,11 @@ Both propulsion options share the same Black Panther carbon/PETG airframe and ar
 | ![A2212 3D Analysis](fem_results/openfoam_a2212_3d_analysis.png) | ![A2212 Contours](fem_results/openfoam_a2212_8045_cfd.png) |
 | **Turbulence (`k`) & Eddy Viscosity** | **Axial Cross-Sections (`Z = +90..-80 mm`)** |
 | ![A2212 Turbulence](fem_results/openfoam_a2212_turbulence.png) | ![A2212 Axial Slices](fem_results/openfoam_a2212_axial_slices.png) |
-| **Blade-Resolved `8045` MRF (`12,000 RPM`, `41,872` cells)** | **`15 m/s` (`54 km/h`) Wind-Tunnel Crosswind Test (`23,715` cells)** |
+| **Blade-Resolved `8045` MRF (`12,000 RPM`, `42,335` cells)** | **`15 m/s` (`54 km/h`) Wind-Tunnel Crosswind Test (`30,595` cells)** |
 | ![Prop Blade MRF](fem_results/openfoam_prop_blade_cfd.png) | ![Wind Tunnel Test](fem_results/openfoam_wind_tunnel_cfd.png) |
 
-- **Blade-Resolved `8045` MRF (`run_openfoam_prop_wind_cfd.py`):** `41,872` cells at `12,000 RPM`, `|U|_max = 48.52 m/s` at blade tips, `p ∈ [-3,855, +4,446] Pa`.
-- **`15 m/s` (`54 km/h`) Crosswind Tunnel:** `23,715` cells around full `Prop_8045` + `A2212` + `3× Gimbal Rings`, `|U|_max = 26.39 m/s`, `p ∈ [-555, +191] Pa`, capturing downward slipstream deflection and gimbal wake.
+- **Blade-Resolved Swept-`8045` MRF (`run_openfoam_prop_wind_cfd.py`):** `42,335` cells at `12,000 RPM`, `|U|_max = 49.74 m/s` at blade tips, `p ∈ [-3,736, +5,104] Pa`.
+- **`15 m/s` (`54 km/h`) Crosswind Tunnel:** `30,595` cells around full `Prop_8045` + `A2212` + `3× Gimbal Rings`, `|U|_max = 24.34 m/s`, `p ∈ [-441, +204] Pa`, capturing upper-surface suction, downward slipstream deflection, and gimbal wake.
 
 ---
 
