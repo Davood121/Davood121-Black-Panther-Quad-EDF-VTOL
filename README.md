@@ -61,16 +61,30 @@ flowchart LR
 
 ---
 
-## 2. 3D OpenFOAM-12 RANS CFD Gallery
+## 2. Two Complete Build Configurations (FVM / OpenFOAM-12 CFD Suites)
 
-All CFD cases solve steady incompressible RANS (k-ω SST) via `foamRun` on `snappyHexMesh` grids exported directly from FreeCAD 1.1.4:
+Both propulsion options share the same Black Panther carbon/PETG airframe and are included in this repo with full CAD, FVM/CFD, and printable STL plates:
 
-| Raised (`+30 mm`) `A2212 + 8045` (`21,704` cells) | `A2212 + 8045` Contours & Streamlines |
+### Option A (Recommended to Build & Fly): `A2212/10T 1400KV + 8045` Open Propeller (`3S` LiPo)
+- **Why it's best:** `18.9×` larger swept area, `25–40×` lower disk loading, `>60%` lower hover power, and `20.78 mm` prop-arm clearance at `±25°` tilt.
+- **Printable STL:** [`print_stl/black_panther_a2212_all_printable.stl`](print_stl/black_panther_a2212_all_printable.stl) *(34 parts)* & [`print_stl/black_panther_a2212_1pod_test.stl`](print_stl/black_panther_a2212_1pod_test.stl) *(1-pod test)*
+
+| 3D Pod & Wake (`21,704` cells) | Downwash & Pressure Jump |
 | :---: | :---: |
 | ![A2212 3D Analysis](fem_results/openfoam_a2212_3d_analysis.png) | ![A2212 Contours](fem_results/openfoam_a2212_8045_cfd.png) |
-| **`50 mm` Bellmouth EDF (`65,952` cells)** | **Bellmouth Streamlines & Turbulence (`k`)** |
+| **Turbulence (`k`) & Eddy Viscosity** | **Axial Cross-Sections (`Z = +90..-80 mm`)** |
+| ![A2212 Turbulence](fem_results/openfoam_a2212_turbulence.png) | ![A2212 Axial Slices](fem_results/openfoam_a2212_axial_slices.png) |
+
+---
+
+### Option B (Jet-Pod Variant): `50 mm` 11-Blade Bellmouth EDF (`4S` LiPo)
+- **When to choose:** Stealth ducted-jet appearance with two-stage bellmouth + `2.8 mm` rolled torus lip (`71.13 m/s` peak jet, `59.70 m/s` mean nozzle exit).
+- **Printable STL:** [`print_stl/black_panther_edf_50mm_all_printable.stl`](print_stl/black_panther_edf_50mm_all_printable.stl) *(38 parts)*
+
+| Velocity & Static Pressure (`65,952` cells) | Streamlines & Turbulence (`k`) |
+| :---: | :---: |
 | ![EDF 3D CFD](fem_results/openfoam_3d_cfd.png) | ![EDF Streamlines](fem_results/openfoam_streamlines_turbulence.png) |
-| **EDF Axial Cross-Sections (`Z = +35..-60 mm`)** | **EDF 3D Mesh & Axial Profiles** |
+| **Axial Cross-Sections (`Z = +35..-60 mm`)** | **3D Mesh & Axial Profiles** |
 | ![EDF Axial Slices](fem_results/openfoam_axial_slices.png) | ![EDF 3D Profiles](fem_results/openfoam_3d_duct_and_profiles.png) |
 
 ---

@@ -94,6 +94,30 @@ def main():
 
     App.closeDocument(src.Name)
 
+    # Also export the 50mm EDF version combined print plate from black_panther_quad_edf.FCStd
+    edf_src = App.openDocument(os.path.join(SCRIPT_DIR, "black_panther_quad_edf.FCStd"))
+    edf_names = [
+        "Panther_X_Chassis", "Panther_Battery_Bay", "Panther_Electronics_Bay",
+        "Panther_Top_Cover", "Panther_Arm_FL", "Panther_Arm_FR", "Panther_Arm_RL", "Panther_Arm_RR",
+    ]
+    for tag in ("FL", "FR", "RL", "RR"):
+        edf_names.extend([
+            f"{tag}_EDF_Shroud", f"{tag}_EDF_Exhaust_Nozzle", f"{tag}_EDF_Rotor_11Blade",
+            f"{tag}_Innermost_Gimbal_Ring", f"{tag}_Inner_Gimbal_Ring",
+            f"{tag}_Spur_Gear_Upper", f"{tag}_Spur_Gear_Lower",
+        ])
+    edf_items = [(n, edf_src.getObject(n).Shape) for n in edf_names if edf_src.getObject(n) is not None]
+    skids_edf = edf_src.getObject("Panther_Landing_Skids")
+    if skids_edf is not None:
+        for idx, solid in enumerate(skids_edf.Shape.Solids):
+            s = solid.copy()
+            s.rotate(App.Vector(0, 0, 0), App.Vector(1, 0, 0), 90.0)
+            edf_items.append((f"Panther_Landing_Skid_{idx + 1}", s))
+    out_edf = os.path.join(OUT_DIR, "black_panther_edf_50mm_all_printable.stl")
+    n_edf, dims_edf = pack_parts_to_stl(edf_items, out_edf)
+    print(f"EXPORTED_EDF_STL: {out_edf} | parts={n_edf} | bbox={dims_edf[0]:.1f}x{dims_edf[1]:.1f}x{dims_edf[2]:.1f} mm")
+    App.closeDocument(edf_src.Name)
+
 
 if __name__ in ("__main__", "export_all_printable_stl"):
     main()

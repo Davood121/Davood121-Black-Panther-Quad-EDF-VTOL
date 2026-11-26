@@ -20,3 +20,4 @@ cfd_case_a2212/
 print_stl/*.stl
 !print_stl/black_panther_a2212_all_printable.stl
 !print_stl/black_panther_a2212_1pod_test.stl
+!print_stl/black_panther_edf_50mm_all_printable.stl
