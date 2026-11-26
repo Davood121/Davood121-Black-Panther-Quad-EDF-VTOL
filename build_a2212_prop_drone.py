@@ -54,33 +54,34 @@ def build_a2212_motor():
 
 
 def build_prop_8045():
-    """8045 (8x4.5 inch, 203.2mm diameter) 2-blade twisted propeller centered at x=68.5mm (30mm raised)."""
+    """8045 (8x4.5 inch, 203.2mm) swept-paddle slow-fly propeller matching user's prop."""
     x_hub = 65.5
-    hub = Part.makeCylinder(7.2, 6.2, App.Vector(x_hub, 0, 0), App.Vector(1, 0, 0))
-    bore = Part.makeCylinder(3.0, 7.0, App.Vector(x_hub - 0.4, 0, 0), App.Vector(1, 0, 0))
+    hub = Part.makeCylinder(7.2, 6.8, App.Vector(x_hub, 0, 0), App.Vector(1, 0, 0))
+    bore = Part.makeCylinder(3.0, 7.6, App.Vector(x_hub - 0.4, 0, 0), App.Vector(1, 0, 0))
     prop = hub.cut(bore)
 
-    # Build 2 twisted airfoil-like blades out to R = 101.6 mm (start at r=6.0mm inside hub -> 1 solid)
-    radii = [6.0, 28.0, 52.0, 78.0, 101.6]
-    chords = [13.0, 20.5, 22.0, 17.5, 9.0]
-    thicks = [3.0, 2.4, 1.8, 1.3, 0.9]
-    pitches = [22.0, 18.0, 14.0, 11.0, 9.0]
+    # Swept elliptical paddle planform: narrow root neck -> wide mid-blade -> rounded tip
+    radii = [5.5, 16.0, 36.0, 62.0, 86.0, 101.6]
+    chords = [8.5, 11.5, 22.5, 24.0, 17.0, 7.5]
+    thicks = [3.2, 2.8, 2.2, 1.6, 1.1, 0.7]
+    pitches = [24.0, 21.0, 16.5, 12.5, 9.5, 7.5]
+    sweeps = [0.0, 1.5, 4.0, 5.0, 3.0, -1.0]
 
     for side in (0.0, 180.0):
         wires = []
-        for r, c, t, deg in zip(radii, chords, thicks, pitches):
+        for r, c, t, deg, sw in zip(radii, chords, thicks, pitches, sweeps):
             pts = [
-                App.Vector(-t * 0.5, -c * 0.5, r),
-                App.Vector(t * 0.5, -c * 0.5, r),
-                App.Vector(t * 0.5, c * 0.5, r),
-                App.Vector(-t * 0.5, c * 0.5, r),
-                App.Vector(-t * 0.5, -c * 0.5, r),
+                App.Vector(-t * 0.5, -c * 0.42 + sw, r),
+                App.Vector(t * 0.5, -c * 0.42 + sw, r),
+                App.Vector(t * 0.5, c * 0.58 + sw, r),
+                App.Vector(-t * 0.5, c * 0.58 + sw, r),
+                App.Vector(-t * 0.5, -c * 0.42 + sw, r),
             ]
             w = Part.makePolygon(pts)
-            w.rotate(App.Vector(0, 0, r), App.Vector(0, 0, 1), deg)
+            w.rotate(App.Vector(0, sw, r), App.Vector(0, 0, 1), deg)
             wires.append(w)
         blade = Part.makeLoft(wires, True, False)
-        blade.translate(App.Vector(x_hub + 3.1, 0, 0))
+        blade.translate(App.Vector(x_hub + 3.4, 0, 0))
         blade.rotate(App.Vector(0, 0, 0), App.Vector(1, 0, 0), side)
         prop = prop.fuse(blade)
     return prop

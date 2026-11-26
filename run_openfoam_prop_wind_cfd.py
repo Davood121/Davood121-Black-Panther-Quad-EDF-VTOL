@@ -345,35 +345,46 @@ boundaryField
     u_mag = np.linalg.norm(u_vec, axis=1)
     print(f"PROP_MRF_OK | cells={len(u_mag)} | max_|U|={u_mag.max():.2f} m/s | p_range=[{p_pa.min():.0f}, {p_pa.max():.0f}] Pa")
 
-    # Plot XY blade-plane slice (Z=68mm) and XZ centerplane
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13.5, 5.8), dpi=150, facecolor="#16181d")
+    # Plot XY blade-plane slice (Z=68mm) and XZ centerplane at high clarity (220 DPI, percentile contrast)
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15.0, 6.4), dpi=220, facecolor="#0d1117")
     fig.suptitle(
-        f"OpenFOAM-12 Blade-Resolved 3D Propeller MRF (8045 @ 12,000 RPM, {len(u_mag):,} cells)",
-        color="white", fontsize=12, fontweight="bold", y=0.97,
+        f"OpenFOAM-12 Blade-Resolved 3D Swept-8045 Propeller MRF (12,000 RPM, {len(u_mag):,} cells)",
+        color="#f8fafc", fontsize=13, fontweight="bold", y=0.97,
     )
     m_xy = np.abs(cc[:, 2] - 68.0) < 9.0
-    ax1.set_facecolor("#16181d")
-    tc1 = ax1.tricontourf(cc[m_xy, 0], cc[m_xy, 1], u_mag[m_xy], levels=28, cmap="turbo")
-    ax1.set_title(f"8045 Blade Plane (Z=+68mm) Velocity |U| (Max {u_mag[m_xy].max():.1f} m/s)", color="#e5e7eb", fontsize=10)
-    ax1.set_xlabel("X (mm)", color="#e5e7eb")
-    ax1.set_ylabel("Y (mm)", color="#e5e7eb")
+    u_hi = float(np.percentile(u_mag[m_xy], 99.2))
+    ax1.set_facecolor("#0d1117")
+    tc1 = ax1.tricontourf(cc[m_xy, 0], cc[m_xy, 1], u_mag[m_xy], levels=np.linspace(0.0, u_hi, 36), cmap="turbo", extend="max")
+    ax1.add_patch(plt.Circle((0, 0), 101.6, fill=False, edgecolor="#e2e8f0", linestyle="--", linewidth=1.1, alpha=0.75))
+    ax1.set_title(f"8045 Blade Plane (Z=+68mm) Velocity |U| (Max {u_mag[m_xy].max():.1f} m/s)", color="#e5e7eb", fontsize=10.5)
+    ax1.set_xlabel("X (mm)", color="#cbd5e1")
+    ax1.set_ylabel("Y (mm)", color="#cbd5e1")
+    ax1.set_xlim(-180, 180)
+    ax1.set_ylim(-180, 180)
     ax1.set_aspect("equal")
-    ax1.tick_params(colors="#9ca3af")
+    ax1.tick_params(colors="#94a3b8")
     cb1 = fig.colorbar(tc1, ax=ax1, shrink=0.84)
-    cb1.set_label("m/s", color="#e5e7eb")
-    cb1.ax.yaxis.set_tick_params(color="#9ca3af", labelcolor="#e5e7eb")
+    cb1.set_label("m/s", color="#cbd5e1")
+    cb1.ax.yaxis.set_tick_params(color="#94a3b8", labelcolor="#cbd5e1")
 
     m_xz = np.abs(cc[:, 1]) < 12.0
-    ax2.set_facecolor("#16181d")
-    tc2 = ax2.tricontourf(cc[m_xz, 0], cc[m_xz, 2], p_pa[m_xz], levels=28, cmap="coolwarm")
-    ax2.set_title(f"Static Pressure Around 8045 Blades & Pod (Pa)", color="#e5e7eb", fontsize=10)
-    ax2.set_xlabel("X (mm)", color="#e5e7eb")
-    ax2.set_ylabel("Z (mm)", color="#e5e7eb")
+    p_lo, p_hi = np.percentile(p_pa[m_xz], [1.5, 98.5])
+    p_abs = max(abs(p_lo), abs(p_hi), 50.0)
+    ax2.set_facecolor("#0d1117")
+    tc2 = ax2.tricontourf(cc[m_xz, 0], cc[m_xz, 2], p_pa[m_xz], levels=np.linspace(-p_abs, p_abs, 36), cmap="RdBu_r", extend="both")
+    ax2.plot([-101.6, 101.6], [68.5, 68.5], color="#0f172a", lw=2.8)
+    ax2.add_patch(plt.Rectangle((-14, 30), 28, 35, fill=False, edgecolor="#0f172a", lw=1.4))
+    ax2.add_patch(plt.Rectangle((-45, -6), 90, 12, fill=False, edgecolor="#0f172a", lw=1.4))
+    ax2.set_title("Static Pressure Around Swept-8045 Blades & Pod (Pa)", color="#e5e7eb", fontsize=10.5)
+    ax2.set_xlabel("X (mm)", color="#cbd5e1")
+    ax2.set_ylabel("Z (mm)", color="#cbd5e1")
+    ax2.set_xlim(-180, 180)
+    ax2.set_ylim(-160, 150)
     ax2.set_aspect("equal")
-    ax2.tick_params(colors="#9ca3af")
+    ax2.tick_params(colors="#94a3b8")
     cb2 = fig.colorbar(tc2, ax=ax2, shrink=0.84)
-    cb2.set_label("Pa", color="#e5e7eb")
-    cb2.ax.yaxis.set_tick_params(color="#9ca3af", labelcolor="#e5e7eb")
+    cb2.set_label("Pa", color="#cbd5e1")
+    cb2.ax.yaxis.set_tick_params(color="#94a3b8", labelcolor="#cbd5e1")
 
     out_png = os.path.join(BASE_DIR, "fem_results", "openfoam_prop_blade_cfd.png")
     plt.tight_layout(rect=[0, 0, 1, 0.93])
@@ -403,7 +414,7 @@ vertices
     ( 0.36  0.22  0.20)
     (-0.22  0.22  0.20)
 );
-blocks ( hex (0 1 2 3 4 5 6 7) (30 24 24) simpleGrading (1 1 1) );
+blocks ( hex (0 1 2 3 4 5 6 7) (34 26 26) simpleGrading (1 1 1) );
 patches
 (
     patch inlet ( (0 4 7 3) )
@@ -527,17 +538,21 @@ boundaryField
     run_of(CASE_WIND, "foamPostProcess -func writeCellCentres -time 0")
     run_of(CASE_WIND, "foamRun")
 
-    # Parse aerodynamic forces (drag Fx, lift Fz)
-    f_path = os.path.join(CASE_WIND, "postProcessing", "forces", "0", "force.dat")
+    # Parse aerodynamic forces (drag Fx, lift Fz) from any time folder in postProcessing/forces
     drag_n, lift_n = 0.0, 0.0
-    if os.path.exists(f_path):
-        with open(f_path, "r", encoding="utf-8", errors="ignore") as f:
-            last = [ln for ln in f.readlines() if ln.strip() and not ln.strip().startswith("#")][-1]
-        nums = [float(x) for x in last.replace("(", " ").replace(")", " ").split()]
-        # OpenFOAM force.dat: time, (total_x total_y total_z) or (fp_x fp_y fp_z) (fv_x fv_y fv_z)
-        if len(nums) >= 7:
-            drag_n = nums[1] + nums[4]
-            lift_n = nums[3] + nums[6]
+    f_root = os.path.join(CASE_WIND, "postProcessing", "forces")
+    if os.path.exists(f_root):
+        sub_t = sorted([d for d in os.listdir(f_root) if os.path.isdir(os.path.join(f_root, d))], key=lambda x: float(x) if x.replace(".", "").isdigit() else -1)
+        if sub_t:
+            f_path = os.path.join(f_root, sub_t[-1], "force.dat")
+            if os.path.exists(f_path):
+                with open(f_path, "r", encoding="utf-8", errors="ignore") as f:
+                    lines = [ln for ln in f.readlines() if ln.strip() and not ln.strip().startswith("#")]
+                if lines:
+                    nums = [float(x) for x in lines[-1].replace("(", " ").replace(")", " ").split()]
+                    if len(nums) >= 7:
+                        drag_n = nums[1] + nums[4]
+                        lift_n = nums[3] + nums[6]
 
     t_dirs = [d for d in os.listdir(CASE_WIND) if d.isdigit() and int(d) > 0]
     lt = max(t_dirs, key=int)
@@ -560,33 +575,42 @@ boundaryField
     UX_g = np.ma.filled(mtri.LinearTriInterpolator(tri, ux)(GX, GZ), 0.0)
     UZ_g = np.ma.filled(mtri.LinearTriInterpolator(tri, uz)(GX, GZ), 0.0)
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14.0, 5.8), dpi=150, facecolor="#16181d")
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15.0, 6.4), dpi=220, facecolor="#0d1117")
     fig.suptitle(
-        f"OpenFOAM-12 Wind-Tunnel Test: 15 m/s (54 km/h) Crosswind + 8045 Pod ({len(u_mag):,} cells, Drag={drag_n:.2f} N)",
-        color="white", fontsize=12, fontweight="bold", y=0.97,
+        f"OpenFOAM-12 Wind-Tunnel Test: 15 m/s (54 km/h) Crosswind + Swept-8045 Pod ({len(u_mag):,} cells, Drag={drag_n:.2f} N)",
+        color="#f8fafc", fontsize=12.5, fontweight="bold", y=0.97,
     )
-    ax1.set_facecolor("#16181d")
-    tc1 = ax1.tricontourf(xs, zs, um, levels=28, cmap="turbo")
-    ax1.streamplot(gx, gz, UX_g, UZ_g, color="white", density=1.25, linewidth=0.75, arrowsize=0.9)
-    ax1.set_title(f"Crosswind Velocity |U| & Wake Deflection (Max {um.max():.1f} m/s)", color="#e5e7eb", fontsize=10)
-    ax1.set_xlabel("Streamwise X (mm) [15 m/s ->]", color="#e5e7eb")
-    ax1.set_ylabel("Vertical Z (mm)", color="#e5e7eb")
+    ax1.set_facecolor("#0d1117")
+    u_hi = float(np.percentile(um, 99.2))
+    tc1 = ax1.tricontourf(xs, zs, um, levels=np.linspace(0.0, u_hi, 36), cmap="turbo", extend="max")
+    ax1.streamplot(gx, gz, UX_g, UZ_g, color="white", density=1.35, linewidth=0.85, arrowsize=1.0)
+    ax1.plot([-101.6, 101.6], [68.5, 68.5], color="#0f172a", lw=3.0)
+    ax1.add_patch(plt.Rectangle((-14, 30), 28, 35, fill=False, edgecolor="#0f172a", lw=1.6))
+    ax1.add_patch(plt.Rectangle((-45, -6), 90, 12, fill=False, edgecolor="#0f172a", lw=1.6))
+    ax1.set_title(f"Crosswind Velocity |U| & Wake Deflection (Max {um.max():.1f} m/s)", color="#e5e7eb", fontsize=10.5)
+    ax1.set_xlabel("Streamwise X (mm)  [15 m/s ->]", color="#cbd5e1")
+    ax1.set_ylabel("Vertical Z (mm)", color="#cbd5e1")
     ax1.set_aspect("equal")
-    ax1.tick_params(colors="#9ca3af")
+    ax1.tick_params(colors="#94a3b8")
     cb1 = fig.colorbar(tc1, ax=ax1, shrink=0.84)
-    cb1.set_label("m/s", color="#e5e7eb")
-    cb1.ax.yaxis.set_tick_params(color="#9ca3af", labelcolor="#e5e7eb")
+    cb1.set_label("m/s", color="#cbd5e1")
+    cb1.ax.yaxis.set_tick_params(color="#94a3b8", labelcolor="#cbd5e1")
 
-    ax2.set_facecolor("#16181d")
-    tc2 = ax2.tricontourf(xs, zs, pm, levels=28, cmap="coolwarm")
-    ax2.set_title("Wind-Tunnel Static Pressure (Pa)", color="#e5e7eb", fontsize=10)
-    ax2.set_xlabel("Streamwise X (mm) [15 m/s ->]", color="#e5e7eb")
-    ax2.set_ylabel("Vertical Z (mm)", color="#e5e7eb")
+    ax2.set_facecolor("#0d1117")
+    p_lo, p_hi = np.percentile(pm, [1.5, 98.5])
+    p_abs = max(abs(p_lo), abs(p_hi), 30.0)
+    tc2 = ax2.tricontourf(xs, zs, pm, levels=np.linspace(-p_abs, p_abs, 36), cmap="RdBu_r", extend="both")
+    ax2.plot([-101.6, 101.6], [68.5, 68.5], color="#0f172a", lw=3.0)
+    ax2.add_patch(plt.Rectangle((-14, 30), 28, 35, fill=False, edgecolor="#0f172a", lw=1.6))
+    ax2.add_patch(plt.Rectangle((-45, -6), 90, 12, fill=False, edgecolor="#0f172a", lw=1.6))
+    ax2.set_title("Wind-Tunnel Static Pressure Contrast (Pa)", color="#e5e7eb", fontsize=10.5)
+    ax2.set_xlabel("Streamwise X (mm)  [15 m/s ->]", color="#cbd5e1")
+    ax2.set_ylabel("Vertical Z (mm)", color="#cbd5e1")
     ax2.set_aspect("equal")
-    ax2.tick_params(colors="#9ca3af")
+    ax2.tick_params(colors="#94a3b8")
     cb2 = fig.colorbar(tc2, ax=ax2, shrink=0.84)
-    cb2.set_label("Pa", color="#e5e7eb")
-    cb2.ax.yaxis.set_tick_params(color="#9ca3af", labelcolor="#e5e7eb")
+    cb2.set_label("Pa", color="#cbd5e1")
+    cb2.ax.yaxis.set_tick_params(color="#94a3b8", labelcolor="#cbd5e1")
 
     out_png = os.path.join(BASE_DIR, "fem_results", "openfoam_wind_tunnel_cfd.png")
     plt.tight_layout(rect=[0, 0, 1, 0.93])
